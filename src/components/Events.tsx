@@ -8,13 +8,13 @@ export default function Events({ onOpenTickets }: { onOpenTickets: (eventId: str
       name: 'Capital One Star Event Complex',
       location: 'GRA Area, Katsina (Near Old Government House)',
       features: 'High capacity outdoor stage, floodlights, premium security, air-conditioned VIP domes, custom food parks.',
-      image: 'https://picsum.photos/id/111/400/250'
+      image: 'https://i.ibb.co/C5f5GjP2/Save-Clip-App-709266376-18142802344512424-3230420809209678918-n.jpg'
     },
     {
       name: 'Muhammad Dikko Stadium',
       location: 'Futsal Main Arena, Katsina State',
       features: 'Full audience seating, synthetic pro futsal flooring, secure team locker rooms, digital scoreboard.',
-      image: 'https://picsum.photos/id/857/400/250'
+      image: 'https://i.ibb.co/21GVk3ZS/Save-Clip-App-612492757-18434990020104472-1418675101823816177-n.jpg'
     }
   ];
 
@@ -23,19 +23,19 @@ export default function Events({ onOpenTickets }: { onOpenTickets: (eventId: str
       title: '2025 Sallah Music Fest',
       date: 'Eid-El-Kabir 2025',
       spectators: '5,000+ Youth',
-      bgImg: 'https://picsum.photos/id/453/400/300'
+      bgImg: 'https://i.ibb.co/Pv9m1fbs/Save-Clip-App-608425459-18128413468512424-1110371233661330437-n.jpg'
     },
     {
       title: '7RCL Championship Game 2025',
       date: 'December 2025',
       spectators: 'Full Capacity Crowd',
-      bgImg: 'https://picsum.photos/id/1058/400/300'
+      bgImg: 'https://i.ibb.co/7dDFQtP8/Save-Clip-App-612594851-18434989867104472-5998431100374540038-n.jpg'
     },
     {
       title: '7Rings Katsina Art Fair',
       date: 'September 2025',
       spectators: '30+ Artists Showcased',
-      bgImg: 'https://picsum.photos/id/353/400/300'
+      bgImg: 'https://i.ibb.co/1t5xMRZW/Save-Clip-App-612098626-18434990029104472-2863604098205038663-n.jpg'
     }
   ];
 
