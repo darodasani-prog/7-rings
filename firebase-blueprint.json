@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role and contact information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "email", "role", "createdAt"]
+    },
+    "Ticket": {
+      "title": "Ticket",
+      "description": "Event ticket reservation and payment record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "eventId": { "type": "string" },
+        "eventTitle": { "type": "string" },
+        "eventDate": { "type": "string" },
+        "eventTime": { "type": "string" },
+        "eventVenue": { "type": "string" },
+        "buyerName": { "type": "string" },
+        "buyerEmail": { "type": "string" },
+        "buyerPhone": { "type": "string" },
+        "tier": { "type": "string", "enum": ["Regular", "VIP", "VVIP Sponsor"] },
+        "quantity": { "type": "integer" },
+        "totalPaid": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "bookedAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["PENDING_PAYMENT", "CONFIRMED", "REFUND_PENDING", "CANCELLED"] },
+        "paid": { "type": "boolean" }
+      },
+      "required": [
+        "id", "userId", "eventId", "eventTitle", "eventDate", "eventTime", "eventVenue",
+        "buyerName", "buyerEmail", "buyerPhone", "tier", "quantity", "totalPaid",
+        "paymentMethod", "bookedAt", "status", "paid"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles collection"
+    },
+    "/tickets/{ticketId}": {
+      "schema": "Ticket",
+      "description": "Purchased event tickets and payment state"
+    }
+  }
+}

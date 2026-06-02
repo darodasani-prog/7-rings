@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, Trophy, Sun, Moon } from 'lucide-react';
+import { Menu, X, Trophy, Sun, Moon, LogIn, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Logo from './Logo';
+import { useAuth } from '../context/AuthContext';
 
 export default function Navbar({ onOpenTickets }: { onOpenTickets: (eventId?: string | null) => void }) {
+  const { user, loginWithGoogle, logout } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -130,11 +133,11 @@ export default function Navbar({ onOpenTickets }: { onOpenTickets: (eventId?: st
           </div>
 
           {/* Call To Action Buttons */}
-          <div className="hidden md:flex items-center space-x-4" id="nav-cta-container">
+          <div className="hidden md:flex items-center space-x-3" id="nav-cta-container">
             {/* Theme Toggle Button */}
             <button
               onClick={toggleTheme}
-              className="p-2.5 rounded-full border border-gray-800 text-gray-400 hover:text-cyan-neon hover:border-cyan-neon/30 bg-black/40 transition-all cursor-pointer flex items-center justify-center h-9 w-9"
+              className="p-2 rounded-full border border-gray-800 text-gray-400 hover:text-cyan-neon hover:border-cyan-neon/30 bg-black/40 transition-all cursor-pointer flex items-center justify-center h-8.5 w-8.5"
               aria-label="Toggle Theme"
             >
               {theme === 'light' ? (
@@ -144,20 +147,47 @@ export default function Navbar({ onOpenTickets }: { onOpenTickets: (eventId?: st
               )}
             </button>
 
+            {user ? (
+              <div className="flex items-center space-x-2 border border-zinc-805 bg-black/50 px-2.5 py-1 rounded-sm h-8.5">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt={user.displayName || 'User'} className="w-5 h-5 rounded-full border border-zinc-700" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-5 h-5 rounded-full bg-cyan-neon/20 border border-cyan-neon/40 flex items-center justify-center text-[10px] text-cyan-neon font-black uppercase">
+                    {(user.displayName || 'U')[0]}
+                  </div>
+                )}
+                <span className="text-zinc-350 text-[11px] font-sans font-medium max-w-[70px] truncate">{user.displayName || 'Member'}</span>
+                <button
+                  onClick={logout}
+                  className="text-[9px] font-mono text-zinc-500 hover:text-red-400 transition-colors uppercase font-bold pl-2 border-l border-zinc-800"
+                  title="Sign Out"
+                >
+                  Out
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={loginWithGoogle}
+                className="flex items-center space-x-1 px-3 py-1.5 rounded-sm border border-zinc-800 hover:border-zinc-750 bg-black/40 hover:bg-zinc-900 text-zinc-300 hover:text-white font-space font-extrabold text-[10px] uppercase tracking-wider transition-all cursor-pointer h-8.5"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Login</span>
+              </button>
+            )}
+
             <button
               onClick={() => onOpenTickets(null)}
-              className="flex items-center space-x-1.5 px-4.5 py-2 rounded-sm border border-cyan-neon/40 bg-black/40 hover:bg-cyan-neon/10 text-white font-space font-extrabold text-xs uppercase tracking-wider transition-all cursor-pointer box-glow-cyan h-9"
+              className="flex items-center space-x-1 px-3 py-1.5 rounded-sm border border-cyan-neon/40 bg-black/40 hover:bg-cyan-neon/10 text-white font-space font-extrabold text-[10px] uppercase tracking-wider transition-all cursor-pointer box-glow-cyan h-8.5"
             >
-              <span className="text-cyan-neon animate-pulse text-xs">🎟️</span>
-              <span>Tickets</span>
+              <span>🎟️ Tickets</span>
             </button>
 
             <button
               onClick={() => scrollToSection('sports')}
-              className="flex items-center space-x-2 bg-gradient-to-r from-cyan-neon to-blue-700 hover:brightness-110 text-white font-space font-extrabold text-xs px-5 py-2.5 rounded-sm uppercase tracking-wider shadow-[0_0_20px_rgba(27,82,255,0.4)] transition-all cursor-pointer hover:scale-103 h-9"
+              className="flex items-center space-x-1 bg-gradient-to-r from-cyan-neon to-blue-700 hover:brightness-110 text-white font-space font-extrabold text-[10px] px-3.5 py-1.5 rounded-sm uppercase tracking-wider shadow-[0_0_15px_rgba(27,82,255,0.3)] transition-all cursor-pointer h-8.5"
             >
-              <Trophy className="w-4 h-4" />
-              <span>7RCL Register</span>
+              <Trophy className="w-3.5 h-3.5" />
+              <span>Register</span>
             </button>
           </div>
 

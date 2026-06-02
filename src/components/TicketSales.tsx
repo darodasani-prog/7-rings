@@ -21,9 +21,13 @@ import {
   Info, 
   Loader2,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  LogIn
 } from 'lucide-react';
 import { upcomingEvents } from '../data/events';
+import { useAuth } from '../context/AuthContext';
+import { db, handleFirestoreError, OperationType } from '../firebase';
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
 
 interface TicketSalesProps {
   isOpen: boolean;
@@ -33,6 +37,7 @@ interface TicketSalesProps {
 
 interface BookedTicket {
   id: string; // 7R-XXXX-XXXX
+  userId: string;
   eventId: string;
   eventTitle: string;
   eventDate: string;
@@ -46,10 +51,12 @@ interface BookedTicket {
   totalPaid: number;
   paymentMethod: string;
   bookedAt: string;
-  status: 'CONFIRMED' | 'REFUND_PENDING' | 'CANCELLED';
+  status: 'PENDING_PAYMENT' | 'CONFIRMED' | 'REFUND_PENDING' | 'CANCELLED';
+  paid: boolean;
 }
 
 export default function TicketSales({ isOpen, onClose, preselectedEventId }: TicketSalesProps) {
+  const { user, loginWithGoogle } = useAuth();
   const [activeTab, setActiveTab] = useState<'book' | 'wallet'>('book');
   
   // Step tracker: 1 = Tier & Quantity, 2 = Buyer Info, 3 = Payment Simulation, 4 = Success Badge
@@ -71,10 +78,19 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
   // Error handling
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Wallet and local records
+  // Wallet database
   const [ticketWallet, setTicketWallet] = useState<BookedTicket[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedWalletTicket, setSelectedWalletTicket] = useState<BookedTicket | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+
+  // Auto-fill user profile info when logged in
+  useEffect(() => {
+    if (user) {
+      setBuyerName(user.displayName || '');
+      setBuyerEmail(user.email || '');
+    }
+  }, [user]);
 
   // Sync preselected event
   useEffect(() => {
@@ -87,23 +103,51 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
     }
   }, [preselectedEventId, isOpen]);
 
-  // Load Wallet items on mount
+  // Sync real wallet tickets Reactive listener from Firestore
   useEffect(() => {
-    const loaded = localStorage.getItem('7rings_ticket_wallet');
-    if (loaded) {
-      try {
-        setTicketWallet(JSON.parse(loaded));
-      } catch (e) {
-        console.error('Failed parsing ticket wallet database', e);
-      }
+    if (!isOpen || !user) {
+      setTicketWallet([]);
+      return;
     }
-  }, [isOpen]);
 
-  // Save Wallet helper
-  const saveWalletToStorage = (updated: BookedTicket[]) => {
-    setTicketWallet(updated);
-    localStorage.setItem('7rings_ticket_wallet', JSON.stringify(updated));
-  };
+    setWalletLoading(true);
+    const ticketsCollection = 'tickets';
+    const q = query(
+      collection(db, ticketsCollection),
+      where('userId', '==', user.uid)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const tempWallet: BookedTicket[] = [];
+        snapshot.forEach((snapDoc) => {
+          tempWallet.push(snapDoc.data() as BookedTicket);
+        });
+        
+        // Sort newest first
+        tempWallet.sort((a, b) => new Date(b.bookedAt).getTime() - new Date(a.bookedAt).getTime());
+        setTicketWallet(tempWallet);
+        
+        // Sync the currently selected wallet item as well if active
+        if (selectedWalletTicket) {
+          const freshItem = tempWallet.find(t => t.id === selectedWalletTicket.id);
+          if (freshItem) setSelectedWalletTicket(freshItem);
+        }
+        setWalletLoading(false);
+      },
+      (error) => {
+        setWalletLoading(false);
+        try {
+          handleFirestoreError(error, OperationType.LIST, ticketsCollection);
+        } catch (err: any) {
+          console.error("Realtime ticket read failed: ", err.message);
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [isOpen, user]);
 
   const getEventData = (id: string) => {
     return upcomingEvents.find(e => e.id === id) || upcomingEvents[0];
@@ -113,8 +157,7 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
 
   // Get pricing based on tier and event structure
   const getTierPrice = (tierName: 'Regular' | 'VIP' | 'VVIP Sponsor', eventId: string) => {
-    // Basic defaults
-    if (eventId === 'e4') return 0; // Community sweepup is free
+    if (eventId === 'e4') return 0; // Community sweeps are free
     
     if (eventId === 'e1') { // 7RCL Grand Finale
       if (tierName === 'Regular') return 1000;
@@ -140,10 +183,10 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
 
   const currentPricePerTicket = getTierPrice(selectedTier, selectedEventId);
   const totalCost = currentPricePerTicket * quantity;
-  const processingFee = totalCost > 0 ? 150 : 0; // Flat payment processing gateway fee
+  const processingFee = totalCost > 0 ? 150 : 0; // standard flat processing fee
   const grandTotal = totalCost + processingFee;
 
-  const handleNextStep = () => {
+  const handleNextStep = async () => {
     if (bookingStep === 1) {
       if (!selectedEventId) {
         setFormError('Please choose an event to purchase tickets for.');
@@ -164,20 +207,18 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
         setFormError('Please enter a valid active phone number.');
         return;
       }
+      if (!user) {
+        setFormError('Sign In/Registration required.');
+        return;
+      }
+
       setFormError(null);
-      setBookingStep(3);
-    }
-  };
+      setSubmittingPayment(true);
 
-  const handleSimulatePayment = () => {
-    setSubmittingPayment(true);
-    setFormError(null);
-
-    setTimeout(() => {
-      // Create a unique ticket database record
       const uniqueRef = `7R-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
       const bookedRecord: BookedTicket = {
         id: uniqueRef,
+        userId: user.uid,
         eventId: selectedEventId,
         eventTitle: activeEvent.title,
         eventDate: activeEvent.date,
@@ -190,54 +231,106 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
         quantity,
         totalPaid: grandTotal,
         paymentMethod: paymentMethod.toUpperCase(),
-        bookedAt: new Date().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
-        status: 'CONFIRMED'
+        bookedAt: new Date().toISOString(),
+        status: 'PENDING_PAYMENT',
+        paid: false
       };
 
-      const updatedWallet = [bookedRecord, ...ticketWallet];
-      saveWalletToStorage(updatedWallet);
-      setNewlyBookedTicket(bookedRecord);
-      setSubmittingPayment(false);
+      const path = `tickets/${uniqueRef}`;
+      try {
+        await setDoc(doc(db, 'tickets', uniqueRef), bookedRecord);
+        setNewlyBookedTicket(bookedRecord);
+        setBookingStep(3); // Proceed to simulated check-out gateway
+      } catch (error) {
+        try {
+          handleFirestoreError(error, OperationType.CREATE, path);
+        } catch (e: any) {
+          setFormError(`Failed to save ticket reservation: ${e.message}`);
+        }
+      } finally {
+        setSubmittingPayment(false);
+      }
+    }
+  };
+
+  const handleSimulatePayment = async () => {
+    if (!newlyBookedTicket) return;
+    setSubmittingPayment(true);
+    setFormError(null);
+
+    const path = `tickets/${newlyBookedTicket.id}`;
+    try {
+      await updateDoc(doc(db, 'tickets', newlyBookedTicket.id), {
+        status: 'CONFIRMED',
+        paid: true,
+        paymentMethod: paymentMethod.toUpperCase()
+      });
+
+      setNewlyBookedTicket(prev => prev ? {
+        ...prev,
+        status: 'CONFIRMED',
+        paid: true,
+        paymentMethod: paymentMethod.toUpperCase()
+      } : null);
+
       setBookingStep(4);
-    }, 2000);
+    } catch (error) {
+      try {
+        handleFirestoreError(error, OperationType.UPDATE, path);
+      } catch (e: any) {
+        setFormError(`Simulated payment gateway failed: ${e.message}`);
+      }
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
+  // Pay pending ticket directly from the user's digital wallet
+  const handlePayWalletTicket = async (ticket: BookedTicket) => {
+    setSubmittingPayment(true);
+    const path = `tickets/${ticket.id}`;
+    try {
+      await updateDoc(doc(db, 'tickets', ticket.id), {
+        status: 'CONFIRMED',
+        paid: true
+      });
+      setSelectedWalletTicket(prev => prev ? { ...prev, status: 'CONFIRMED', paid: true } : null);
+    } catch (error) {
+      try {
+        handleFirestoreError(error, OperationType.UPDATE, path);
+      } catch (e) {
+        console.error("Wallet ticket payment update failed: ", e);
+      }
+    } finally {
+      setSubmittingPayment(false);
+    }
   };
 
   const handleResetForNewBooking = () => {
     setBookingStep(1);
     setQuantity(1);
     setSelectedTier('Regular');
-    setBuyerName('');
-    setBuyerEmail('');
+    setBuyerName(user?.displayName || '');
+    setBuyerEmail(user?.email || '');
     setBuyerPhone('');
     setNewlyBookedTicket(null);
   };
 
-  const handleRequestRefund = (ticketId: string) => {
-    const updated = ticketWallet.map(ticket => {
-      if (ticket.id === ticketId) {
-        return { ...ticket, status: 'REFUND_PENDING' as const };
+  const handleRequestRefund = async (ticketId: string) => {
+    const path = `tickets/${ticketId}`;
+    try {
+      await updateDoc(doc(db, 'tickets', ticketId), {
+        status: 'REFUND_PENDING'
+      });
+      if (selectedWalletTicket && selectedWalletTicket.id === ticketId) {
+        setSelectedWalletTicket(prev => prev ? { ...prev, status: 'REFUND_PENDING' } : null);
       }
-      return ticket;
-    });
-    saveWalletToStorage(updated);
-    
-    // update current selected ticket reference if matching
-    if (selectedWalletTicket && selectedWalletTicket.id === ticketId) {
-      setSelectedWalletTicket({ ...selectedWalletTicket, status: 'REFUND_PENDING' });
-    }
-  };
-
-  const handleDeleteTicketRecord = (ticketId: string) => {
-    if (window.confirm('Are you sure you want to remove this ticket from your digital wallet history?')) {
-      const filtered = ticketWallet.filter(t => t.id !== ticketId);
-      saveWalletToStorage(filtered);
-      setSelectedWalletTicket(null);
+    } catch (error) {
+      try {
+        handleFirestoreError(error, OperationType.UPDATE, path);
+      } catch (e) {
+        console.error("Requesting refund failed: ", e);
+      }
     }
   };
 
@@ -252,6 +345,57 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
   );
 
   if (!isOpen) return null;
+
+  // Unauthenticated Registration and Login Screen overlay - strict goal requirement
+  if (!user) {
+    return (
+      <div className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-md flex justify-center items-center p-2 sm:p-4 overflow-y-auto select-none font-sans">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          className="bg-[#080808] border border-zinc-900 rounded-sm w-full max-w-md p-6 sm:p-8 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.8)] text-white"
+          id="ticket-sales-login-container"
+        >
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center space-x-2">
+              <Ticket className="w-5 h-5 text-cyan-neon" />
+              <h3 className="font-display font-black text-lg uppercase tracking-wider">
+                7 RINGS <span className="text-cyan-neon">SECURE CENTRE</span>
+              </h3>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-sm bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition-colors cursor-pointer text-zinc-400 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="text-center space-y-4 my-6">
+            <div className="w-14 h-14 rounded-full bg-cyan-neon/10 border border-cyan-neon/20 flex items-center justify-center mx-auto text-cyan-neon">
+              <Lock className="w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="font-display font-bold text-base uppercase text-white">Identity Registration Required</h4>
+              <p className="font-sans text-xs text-zinc-400 mt-1 max-w-xs mx-auto leading-relaxed">
+                Connect your account securely. Verify details and access the automated Katsina payment clearing systems.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={loginWithGoogle}
+            className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-cyan-neon to-blue-700 hover:brightness-110 text-white font-space font-extrabold text-xs py-3 rounded-sm uppercase tracking-wider shadow-[0_0_20px_rgba(27,82,255,0.3)] transition-all cursor-pointer h-12"
+          >
+            <LogIn className="w-4 h-4 text-white" />
+            <span>Register & Login with Google</span>
+          </button>
+
+          <p className="text-[10px] text-center text-zinc-650 font-mono uppercase tracking-widest mt-6">
+            🔒 CRYPTOGRAPHIC PASSES • CHIP ACCREDITATION
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-md flex justify-center items-center p-2 sm:p-4 overflow-y-auto select-none font-sans">
@@ -287,7 +431,7 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
           </button>
         </div>
 
-        {/* Tab Controls: Toggle booking vs digital wallet */}
+        {/* Tab Controls */}
         <div className="flex bg-[#030303] border-b border-zinc-950 px-6 shrink-0">
           <button
             onClick={() => setActiveTab('book')}
@@ -534,10 +678,10 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                       id="step-2-elements"
                     >
                       <div className="mb-4">
-                        <span className="font-mono text-[10px] uppercase text-cyan-neon font-bold">CUSTOMER DETAILS SECURE ENTRY</span>
-                        <h3 className="font-display font-bold text-lg text-white uppercase mt-0.5">Let’s secure your digital passes</h3>
+                        <span className="font-mono text-[10px] uppercase text-cyan-neon font-bold">Attendee Credentials Verification</span>
+                        <h3 className="font-display font-bold text-lg text-white uppercase mt-0.5">Contact Clearance</h3>
                         <p className="text-zinc-500 text-xs font-sans">
-                          Tickets will be cryptographically unique to this name, phone number, and inbox. Check details carefully.
+                          A barcode token is attached statically to this attendee. Real-time updates sync directly to your account profile.
                         </p>
                       </div>
 
@@ -594,7 +738,7 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                     </motion.div>
                   )}
 
-                  {bookingStep === 3 && (
+                  {bookingStep === 3 && newlyBookedTicket && (
                     <motion.div
                       initial={{ opacity: 0, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -602,10 +746,10 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                       id="step-3-elements"
                     >
                       <div className="mb-4">
-                        <span className="font-mono text-[10px] uppercase text-gold-accent font-bold">SECURE ENCRYPTED CHECKSUM</span>
-                        <h3 className="font-display font-bold text-lg text-white uppercase mt-0.5">Select Settlement Method</h3>
+                        <span className="font-mono text-[10px] uppercase text-zinc-400 font-bold">RESERVATION LOCKED • PAYMENT WAITING</span>
+                        <h3 className="font-display font-bold text-lg text-white uppercase mt-0.5">Settle Gate Account</h3>
                         <p className="text-zinc-500 text-xs font-sans">
-                          All payments are processed securely under multi-tiered sandboxes with mock bank callbacks.
+                          Tickets are reserved under code <strong className="text-gold-accent font-mono">{newlyBookedTicket.id}</strong> but remain completely locked and un-accredited until payment simulation is fulfilled.
                         </p>
                       </div>
 
@@ -656,24 +800,24 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                         </button>
                       </div>
 
-                      {/* Payment instruction box dynamic */}
+                      {/* Payment instruction box */}
                       <div className="bg-[#040404] border border-zinc-900 p-4 rounded-sm">
                         <div className="flex items-start space-x-2.5">
-                          <Lock className="w-4 h-4 text-gold-accent shrink-0 mt-0.5" />
+                          <Lock className="w-4 h-4 text-[#e6c875] shrink-0 mt-0.5" />
                           <div className="text-xs text-zinc-400 space-y-2">
                             {paymentMethod === 'card' && (
-                              <p>⚡ This is a **simulated sandbox gateway**. To complete, click the confirm payment trigger. Your card will not be charged.</p>
+                              <p>⚡ This is a **simulated sandbox gateway**. Click below to complete mock payment. Invoices update reactively in Firestore database immediately.</p>
                             )}
                             {paymentMethod === 'bank' && (
                               <div className="space-y-1">
                                 <p className="font-semibold text-white">🏦 Sandbox Bank Transfer Routing Details:</p>
                                 <p>Bank Name: **7Rings Katsina Settlement Ltd**</p>
                                 <p>Account Number: **4092 8133 8101**</p>
-                                <p className="text-[10px] text-zinc-550">Click payment simulation trigger to issue instant manual verification check.</p>
+                                <p className="text-[10px] text-zinc-500">Upon successful checkout, the system verifies and clears the lock automatically.</p>
                               </div>
                             )}
                             {paymentMethod === 'ussd' && (
-                              <p>📱 Dial **\*554\*778\*400#** on your virtual registered sim to wire sandbox funds directly to Katsina Sallah Joint organizers.</p>
+                              <p>📱 Dial **\*554\*778\*400#** on your registered line to invoke secure sandbox wire routing directly to 7Rings team organizers.</p>
                             )}
                           </div>
                         </div>
@@ -693,10 +837,10 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                         <div className="mx-auto w-12 h-12 bg-emerald-950/20 border border-emerald-500/30 rounded-full flex items-center justify-center text-emerald-400 mb-3 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
                           <CheckCircle2 className="w-6 h-6 text-emerald-400 animate-bounce" />
                         </div>
-                        <span className="font-mono text-[10px] tracking-widest text-[#10b981] font-black uppercase">RESERVATION CODE SECURED</span>
-                        <h3 className="font-display font-black text-2xl text-white uppercase mt-1">YOU ARE BOOKED IN!</h3>
+                        <span className="font-mono text-[10px] tracking-widest text-[#10b981] font-black uppercase">RESERVATION ACCREDITED</span>
+                        <h3 className="font-display font-black text-2xl text-white uppercase mt-1">PASS UNLOCKED!</h3>
                         <p className="text-zinc-400 text-xs font-sans max-w-sm mx-auto mt-1 leading-relaxed">
-                          Your visual invoice pass has been generated. You can download and save it. It has also been saved to your digital wallet database!
+                          Your holographic ticket has cleared sandbox validation and has been fully saved. QR barcode is now completely accessible.
                         </p>
                       </div>
 
@@ -719,7 +863,7 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                           </div>
 
                           <div className="flex flex-col items-start sm:items-end font-mono text-[10px] text-zinc-400">
-                            <span className="text-zinc-550">TICKET REF</span>
+                            <span className="text-zinc-500">TICKET REF</span>
                             <span className="text-gold-accent font-bold tracking-wider">{newlyBookedTicket.id}</span>
                           </div>
                         </div>
@@ -745,24 +889,24 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                           </div>
                         </div>
 
-                        {/* Barcode / Stub dashed fold row with printable assets */}
+                        {/* Barcode/QR lock gate representation */}
                         <div className="border-t border-dashed border-zinc-800 pt-4 flex flex-col sm:flex-row items-center justify-between gap-5 bg-black/60 p-4 rounded-sm border border-zinc-900/60">
                           
                           <div className="flex items-center space-x-3 text-left">
-                            <QrCode className="w-12 h-12 text-zinc-300 bg-white p-1 rounded-sm shrink-0" />
+                            <QrCode className="w-12 h-12 text-zinc-340 bg-white p-1 rounded-sm shrink-0" />
                             <div>
-                              <span className="font-mono text-[9px] text-zinc-500 block">7R SCAN BARCODE</span>
+                              <span className="font-mono text-[9px] text-zinc-550 block">7R SCAN BARCODE</span>
                               <span className="text-xs text-white uppercase font-mono tracking-widest">{newlyBookedTicket.id}</span>
-                              <span className="font-mono text-[9px] text-[#10b981] font-bold block">● STATUS: VERIFIED</span>
+                              <span className="font-mono text-[9px] text-[#10b981] font-bold block">● STATUS: ACTIVE &amp; ACCESSIBLE</span>
                             </div>
                           </div>
 
                           <div className="text-left sm:text-right font-mono text-[11px]">
-                            <span className="text-zinc-550 block">SIMULATED AMOUNT PAID</span>
+                            <span className="text-zinc-500 block">SIMULATED AMOUNT PAID</span>
                             <span className="text-gold-accent font-bold text-sm tracking-tight block">
                               {newlyBookedTicket.totalPaid === 0 ? 'FREE OUTREACH' : `₦${newlyBookedTicket.totalPaid.toLocaleString()}`}
                             </span>
-                            <span className="text-[9px] text-zinc-600 block">Includes gateway charge</span>
+                            <span className="text-[9px] text-zinc-650 block">Cleared via Sandbox</span>
                           </div>
 
                         </div>
@@ -800,13 +944,13 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                 {bookingStep < 4 && (
                   <div className="mt-8 pt-4 border-t border-zinc-900 flex items-center justify-between shrink-0 bg-[#080808]">
                     
-                    {bookingStep > 1 ? (
+                    {bookingStep > 1 && bookingStep !== 3 ? (
                       <button
                         onClick={() => {
                           setBookingStep(prev => prev - 1);
                           setFormError(null);
                         }}
-                        className="text-xs font-mono text-zinc-500 hover:text-white transition-colors cursor-pointer"
+                        className="text-xs font-mono text-zinc-500 hover:text-white transition-colors cursor-pointer bg-transparent border-0"
                         type="button"
                       >
                         ← Back
@@ -824,11 +968,11 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                         {submittingPayment ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin text-black" />
-                            <span>Routing Funds...</span>
+                            <span>Clearing Funds...</span>
                           </>
                         ) : (
                           <>
-                            <span>Confirm Simulator Payment</span>
+                            <span>Simulate Settlement Now</span>
                             <ChevronRight className="w-4 h-4 text-black" />
                           </>
                         )}
@@ -836,10 +980,20 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                     ) : (
                       <button
                         onClick={handleNextStep}
+                        disabled={submittingPayment}
                         className="flex items-center space-x-1 bg-cyan-neon hover:brightness-110 text-black font-space font-extrabold text-xs px-6 py-3 rounded-sm uppercase tracking-wider transition-all cursor-pointer box-glow-cyan"
                       >
-                        <span>Proceed to details</span>
-                        <ArrowRight className="w-4 h-4 text-black" />
+                        {submittingPayment ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin text-black" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>{bookingStep === 2 ? 'Reserve Slot' : 'Proceed to attendee'}</span>
+                            <ArrowRight className="w-4 h-4 text-black" />
+                          </>
+                        )}
                       </button>
                     )}
 
@@ -912,7 +1066,7 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                 <div className="mt-8 p-3 rounded bg-zinc-950 border border-zinc-900/60 flex items-center space-x-2.5">
                   <Lock className="w-4 h-4 text-[#e6c875] shrink-0" />
                   <p className="font-sans text-[9px] sm:text-[10px] text-zinc-500 leading-normal">
-                    This website serves as a frontend simulation with full printable ticketing outputs. No real bank accounts are tapped.
+                    Secure checkout system connected live to Firestore database. Passes clear reactively upon mockup payments.
                   </p>
                 </div>
 
@@ -928,11 +1082,11 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                 <div>
                   <h3 className="font-display font-bold text-lg text-white uppercase">Your Digital Wallet Database</h3>
                   <p className="text-zinc-500 text-xs font-sans">
-                    Search and retrieve your successfully booked 7Rings passes stored on your local browser profile.
+                    View active verified bookings synced with your registration profile in Firestore.
                   </p>
                 </div>
 
-                {/* Ticket wallet search */}
+                {/* Search */}
                 <div className="relative shrink-0 w-full sm:w-64">
                   <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-zinc-500" />
                   <input
@@ -940,13 +1094,18 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                     placeholder="Search ticket, ref or buyer..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-[#030303] border border-zinc-900 p-2 pl-9 rounded text-xs text-white placeholder-zinc-650 focus:outline-none"
+                    className="w-full bg-[#030303] border border-zinc-900 p-2 pl-9 rounded text-xs text-white placeholder-zinc-650 focus:outline-none focus:ring-1 focus:ring-cyan-neon"
                   />
                 </div>
               </div>
 
-              {ticketWallet.length === 0 ? (
-                /* Empty database view state */
+              {walletLoading ? (
+                <div className="py-16 text-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-cyan-neon mx-auto mb-3" />
+                  <p className="text-xs text-zinc-500 font-mono">RETRIEVING ENCRYPTED TICKETS FROM FIRESTORE...</p>
+                </div>
+              ) : ticketWallet.length === 0 ? (
+                /* Empty wallet state */
                 <div className="py-16 text-center border border-dashed border-zinc-900 rounded-sm bg-[#040404]">
                   <Ticket className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
                   <h4 className="font-display font-extrabold text-sm text-white uppercase tracking-wider">No Booked Seats Detected</h4>
@@ -958,12 +1117,12 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                   
                   {/* Left Column list */}
-                  <div className="md:col-span-5 space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                  <div className="md:col-span-5 space-y-3 max-h-[50vh] overflow-y-auto pr-1" id="wallet-items-list">
                     {filteredWallet.map((walletItem) => (
                       <button
                         key={walletItem.id}
                         onClick={() => setSelectedWalletTicket(walletItem)}
-                        className={`w-full p-4 rounded-sm border text-left flex flex-col justify-between hover:border-zinc-700 transition-all ${
+                        className={`w-full p-4 rounded-sm border text-left flex flex-col justify-between hover:border-zinc-700 transition-all cursor-pointer ${
                           selectedWalletTicket?.id === walletItem.id
                             ? 'bg-[#0a0a0a] border-cyan-neon box-glow-cyan'
                             : 'bg-[#030303] border-zinc-900'
@@ -975,16 +1134,18 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                           </span>
                           <span className={`font-mono text-[8px] px-1.5 py-0.5 rounded font-bold ${
                             walletItem.status === 'CONFIRMED' 
-                              ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900/60' 
+                              ? 'bg-emerald-950/40 text-emerald-450 border border-emerald-900/40' 
+                              : walletItem.status === 'PENDING_PAYMENT'
+                              ? 'bg-amber-950/40 text-amber-500 border border-amber-900/30'
                               : walletItem.status === 'REFUND_PENDING'
-                              ? 'bg-amber-950/40 text-amber-400 border border-amber-900/40'
+                              ? 'bg-[#1a1200] text-[#e6a100] border border-[#3c2a00]'
                               : 'bg-zinc-800 text-zinc-500'
                           }`}>
-                            {walletItem.status}
+                            {walletItem.status === 'PENDING_PAYMENT' ? '🎰 PYMT PENDING' : walletItem.status}
                           </span>
                         </div>
 
-                        <h4 className="font-display font-bold text-sm text-white uppercase mt-2 select-none truncate">
+                        <h4 className="font-display font-bold text-xs text-white uppercase mt-2 truncate">
                           {walletItem.eventTitle}
                         </h4>
 
@@ -1003,7 +1164,7 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                         <div className="flex items-start justify-between border-b border-zinc-900 pb-3">
                           <div>
                             <span className="font-mono text-[8px] text-cyan-neon font-black block">VERIFIED PASS DETAILS</span>
-                            <h4 className="font-display font-extrabold text-sm uppercase text-white mt-0.5">
+                            <h4 className="font-display font-extrabold text-sm uppercase text-white mt-0.5 leading-tight">
                               {selectedWalletTicket.eventTitle}
                             </h4>
                           </div>
@@ -1012,17 +1173,10 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                             <button
                               onClick={() => handleRequestRefund(selectedWalletTicket.id)}
                               disabled={selectedWalletTicket.status !== 'CONFIRMED'}
-                              className="text-[10px] font-mono text-zinc-500 hover:text-amber-500 py-1 px-1.5 bg-zinc-950 hover:bg-zinc-900 border border-zinc-900 hover:border-amber-900/30 rounded transition-colors disabled:opacity-30 disabled:pointer-events-none"
-                              title="Request simulated refund validation"
+                              className="text-[10px] font-mono text-zinc-500 hover:text-[#e6c875] py-1 px-1.5 bg-zinc-950 hover:bg-zinc-900 border border-zinc-900 hover:border-amber-900/30 rounded transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                              title="Request refund validation"
                             >
                               Refund
-                            </button>
-                            <button
-                              onClick={() => handleDeleteTicketRecord(selectedWalletTicket.id)}
-                              className="text-zinc-500 hover:text-red-500 p-1 rounded hover:bg-zinc-950 transition-colors cursor-pointer"
-                              title="Remove ticket pass reference"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
@@ -1032,37 +1186,65 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
                           <p>📌 Venue: <strong className="text-white">{selectedWalletTicket.eventVenue}</strong></p>
                           <p>🗓️ Time &amp; Date: <strong className="text-white">{selectedWalletTicket.eventDate} @ {selectedWalletTicket.eventTime}</strong></p>
                           <p>👤 Registered Attendee: <strong className="text-[#ffdf5e] uppercase">{selectedWalletTicket.buyerName}</strong></p>
-                          <p>📞 Phone: <span>{selectedWalletTicket.buyerPhone}</span></p>
-                          <p>📧 Email: <span>{selectedWalletTicket.buyerEmail}</span></p>
+                          <p>📞 Phone: <span className="text-zinc-200">{selectedWalletTicket.buyerPhone}</span></p>
+                          <p>📧 Email: <span className="text-zinc-200">{selectedWalletTicket.buyerEmail}</span></p>
                           <p>🛍️ Settlement: <span className="font-mono font-bold text-gray-400">{selectedWalletTicket.paymentMethod}</span> ({selectedWalletTicket.quantity} Passes)</p>
-                          <p>🕰️ Secured Booking On: <span className="text-[11px] text-zinc-500">{selectedWalletTicket.bookedAt}</span></p>
+                          <p>🕰️ Reserved On: <span className="text-[11px] text-zinc-550 font-mono">{new Date(selectedWalletTicket.bookedAt).toLocaleDateString()}</span></p>
                         </div>
 
-                        {/* Scan stub section for gate personnel */}
-                        <div className="bg-[#050505] p-3.5 border border-zinc-900 rounded flex items-center justify-between gap-4 mt-6">
-                          <div className="flex items-center space-x-2.5">
-                            <QrCode className="w-10 h-10 text-zinc-400 bg-white p-1 rounded-sm shrink-0" />
-                            <div>
-                              <span className="font-mono text-[8px] text-zinc-600 block">7RINGS GATE VERIFIED</span>
-                              <span className="text-xs font-mono font-black tracking-wider text-zinc-300">{selectedWalletTicket.id}</span>
-                              <span className="text-[9px] uppercase font-mono text-cyan-neon font-black block">● GATE SECURED</span>
+                        {/* Lock / Unlocked payment conditional - exact user intent target */}
+                        {!selectedWalletTicket.paid ? (
+                          <div className="bg-amber-950/10 border border-amber-900/40 p-4 rounded-sm space-y-3 mt-6 text-center">
+                            <div className="flex justify-center items-center space-x-2 text-amber-500">
+                              <Lock className="w-5 h-5" />
+                              <span className="font-display font-black text-xs uppercase tracking-wider">Pass Lock Enabled</span>
                             </div>
+                            <p className="text-zinc-400 text-xs leading-relaxed max-w-sm mx-auto">
+                              Holographic scan stubs and printer drivers are locked because payment is pending. Simulate gateway settlement below to unlock.
+                            </p>
+                            <button
+                              onClick={() => handlePayWalletTicket(selectedWalletTicket)}
+                              disabled={submittingPayment}
+                              className="mx-auto flex items-center justify-center space-x-2 bg-gradient-to-r from-[#e6c875] to-gold-accent hover:brightness-110 text-black font-space font-extrabold text-xs px-5 py-2.5 rounded-sm uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_15px_rgba(230,200,117,0.3)]"
+                            >
+                              {submittingPayment ? (
+                                <>
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />
+                                  <span>Authorizing Check...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>Simulate Pay ₦{selectedWalletTicket.totalPaid.toLocaleString()} Now</span>
+                                </>
+                              )}
+                            </button>
                           </div>
+                        ) : (
+                          <div className="bg-[#050505] p-3.5 border border-zinc-900 rounded flex items-center justify-between gap-4 mt-6">
+                            <div className="flex items-center space-x-2.5">
+                              <QrCode className="w-10 h-10 text-zinc-400 bg-white p-1 rounded-sm shrink-0" />
+                              <div>
+                                <span className="font-mono text-[8px] text-zinc-600 block">7RINGS GATE VERIFIED</span>
+                                <span className="text-xs font-mono font-black tracking-wider text-zinc-350">{selectedWalletTicket.id}</span>
+                                <span className="text-[9px] uppercase font-mono text-cyan-neon font-black block">● ACTIVE CODE APPROVED</span>
+                              </div>
+                            </div>
 
-                          <button
-                            onClick={printTicket}
-                            className="text-[10px] font-mono px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:text-white rounded hover:border-zinc-700 font-bold transition-all shrink-0 cursor-pointer"
-                          >
-                            Print Receipt
-                          </button>
-                        </div>
+                            <button
+                              onClick={printTicket}
+                              className="text-[10px] font-mono px-3 py-1.5 bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white rounded hover:border-zinc-700 font-bold transition-all shrink-0 cursor-pointer"
+                            >
+                              Print Receipt
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="h-full flex flex-col justify-center items-center py-16 text-center">
                         <Info className="w-8 h-8 text-zinc-750 mb-2" />
                         <h4 className="font-display font-extrabold text-xs text-[#aaa] uppercase select-none">No Ticket Selected</h4>
-                        <p className="font-sans text-[11px] text-zinc-600 max-w-[200px] mt-0.5">
-                          Click on any ticket in the left database pane to review QR badges, request simulated refunds, or print passes.
+                        <p className="font-sans text-[11px] text-zinc-650 max-w-[200px] mt-0.5">
+                          Select a ticket in the left pane to check locks, simulate offline clearance, requests refunds, or handle prints.
                         </p>
                       </div>
                     )}
@@ -1077,7 +1259,7 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
 
         {/* Modal overall Bottom Info banner */}
         <div className="px-6 py-3 bg-[#030303] border-t border-zinc-900/60 text-center font-mono text-[10px] text-zinc-650 uppercase tracking-widest shrink-0 hidden sm:block">
-          🛡️ END-TO-END SANITY CHECKS • AUTHENTIC 7RINGS ART &amp; SPORTS CURATOR RESERVATIONS
+          🛡️ CONTEXT-AWARE CHECKSUMS • ACCREDITED FUTSAL &amp; FESTIVALS CORRIDOR
         </div>
 
       </motion.div>

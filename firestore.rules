@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global safety net: default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Standard high-integrity helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // USER RULES
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'role', 'createdAt'])
+        && data.keys().size() == 5
+        && data.uid == request.auth.uid
+        && data.name is string && data.name.size() <= 100
+        && data.email is string && data.email.size() <= 100
+        && data.role in ['user', 'admin']
+        && (data.createdAt == request.time || data.createdAt is string);
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) && incoming().role == existing().role;
+      allow delete: if false;
+    }
+
+    // TICKET RULES
+    function isValidTicket(data) {
+      return data.keys().hasAll([
+        'id', 'userId', 'eventId', 'eventTitle', 'eventDate', 'eventTime', 'eventVenue',
+        'buyerName', 'buyerEmail', 'buyerPhone', 'tier', 'quantity', 'totalPaid',
+        'paymentMethod', 'bookedAt', 'status', 'paid'
+      ])
+        && data.keys().size() == 17
+        && data.userId == request.auth.uid
+        && data.id is string && data.id.size() <= 50
+        && data.eventId is string && data.eventId.size() <= 20
+        && data.eventTitle is string && data.eventTitle.size() <= 200
+        && data.eventDate is string && data.eventDate.size() <= 100
+        && data.eventTime is string && data.eventTime.size() <= 50
+        && data.eventVenue is string && data.eventVenue.size() <= 200
+        && data.buyerName is string && data.buyerName.size() <= 100
+        && data.buyerEmail is string && data.buyerEmail.size() <= 100
+        && data.buyerPhone is string && data.buyerPhone.size() <= 30
+        && data.tier in ['Regular', 'VIP', 'VVIP Sponsor']
+        && data.quantity is int && data.quantity >= 1 && data.quantity <= 10
+        && (data.totalPaid is int || data.totalPaid is float) && data.totalPaid >= 0
+        && data.paymentMethod is string && data.paymentMethod.size() <= 30
+        && (data.bookedAt == request.time || data.bookedAt is string)
+        && data.status in ['PENDING_PAYMENT', 'CONFIRMED', 'REFUND_PENDING', 'CANCELLED']
+        && data.paid is bool;
+    }
+
+    match /tickets/{ticketId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn() && isValidId(ticketId) && isValidTicket(incoming());
+      
+      allow update: if isSignedIn() && isValidId(ticketId) && existing().userId == request.auth.uid && isValidTicket(incoming()) && (
+        incoming().id == existing().id &&
+        incoming().userId == existing().userId &&
+        incoming().eventId == existing().eventId &&
+        incoming().tier == existing().tier &&
+        incoming().quantity == existing().quantity &&
+        incoming().totalPaid == existing().totalPaid &&
+        incoming().bookedAt == existing().bookedAt &&
+        (
+          // Action 1: Pay/Activate
+          (existing().status == 'PENDING_PAYMENT' && incoming().status == 'CONFIRMED' && incoming().paid == true && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paid'])) ||
+          // Action 2: Refund
+          (existing().status == 'CONFIRMED' && incoming().status == 'REFUND_PENDING' && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
+          // Action 3: Cancel
+          (existing().status == 'PENDING_PAYMENT' && incoming().status == 'CANCELLED' && incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+        )
+      );
+
+      allow delete: if false;
+    }
+  }
+}
