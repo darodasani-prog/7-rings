@@ -5,7 +5,7 @@ import Logo from './Logo';
 import { useAuth } from '../context/AuthContext';
 
 export default function Navbar({ onOpenTickets }: { onOpenTickets: (eventId?: string | null) => void }) {
-  const { user, loginWithGoogle, logout } = useAuth();
+  const { user, loginWithGoogle, logout, authError, setAuthError } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -264,6 +264,58 @@ export default function Navbar({ onOpenTickets }: { onOpenTickets: (eventId?: st
                   <span>🎟️ Buy Event Tickets</span>
                 </button>
               </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Absolute Toast Alert for Firebase/Vercel configuration issues */}
+      <AnimatePresence>
+        {authError && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-20 right-4 z-[9999] max-w-sm w-full bg-[#0a0a0a] border border-red-900/50 rounded-sm shadow-[0_10px_30px_rgba(0,0,0,0.5)] p-4 text-white font-sans text-xs"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-900/60 mb-2">
+              <span className="font-mono uppercase font-black text-red-500 tracking-wider flex items-center">
+                🚨 Auth Sync Blocked
+              </span>
+              <button
+                onClick={() => setAuthError(null)}
+                className="p-1 hover:bg-zinc-900 text-zinc-500 hover:text-white rounded cursor-pointer transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <p className="text-zinc-300 leading-relaxed font-sans mb-3 text-[11px]">
+              {authError.message}
+            </p>
+            {(authError.code === 'auth/unauthorized-domain' || authError.message.includes('unauthorized-domain')) && (
+              <div className="bg-black/40 border border-red-900/10 p-2.5 rounded text-[11px] space-y-1.5 leading-relaxed text-zinc-350">
+                <span className="font-bold text-yellow-500 uppercase text-[9px] block">⚙️ ACTION REQUIRED:</span>
+                <p>
+                  Add <code className="bg-red-950/40 px-1 py-0.5 rounded text-yellow-300 select-all font-mono text-[10px]">{authError.domain || window.location.hostname}</code> to <strong>Authorized Domains</strong> in your Firebase Console authentication settings.
+                </p>
+              </div>
+            )}
+            <div className="flex justify-end space-x-2 mt-3 pt-2 border-t border-zinc-900/60">
+              <button
+                onClick={() => setAuthError(null)}
+                className="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white font-mono text-[9px] uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={() => {
+                  setAuthError(null);
+                  loginWithGoogle();
+                }}
+                className="px-2.5 py-1 rounded bg-gradient-to-r from-cyan-neon to-blue-700 text-white font-mono text-[9px] uppercase tracking-wider hover:brightness-110 transition-all cursor-pointer font-bold"
+              >
+                Retry
+              </button>
             </div>
           </motion.div>
         )}

@@ -56,7 +56,7 @@ interface BookedTicket {
 }
 
 export default function TicketSales({ isOpen, onClose, preselectedEventId }: TicketSalesProps) {
-  const { user, loginWithGoogle } = useAuth();
+  const { user, loginWithGoogle, authError, setAuthError } = useAuth();
   const [activeTab, setActiveTab] = useState<'book' | 'wallet'>('book');
   
   // Step tracker: 1 = Tier & Quantity, 2 = Buyer Info, 3 = Payment Simulation, 4 = Success Badge
@@ -389,9 +389,70 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
             <span>Register & Login with Google</span>
           </button>
 
-          <p className="text-[10px] text-center text-zinc-650 font-mono uppercase tracking-widest mt-6">
+          {authError && (
+            <div className="mt-4 p-4 rounded bg-red-950/30 border border-red-900/50 text-red-100 text-xs text-left space-y-2">
+              <div className="flex items-center space-x-2 text-red-400 font-bold uppercase tracking-wider font-mono">
+                <AlertCircle className="w-4 h-4" />
+                <span>Authentication Failure</span>
+              </div>
+              <p className="font-sans leading-relaxed text-zinc-300">
+                {authError.message}
+              </p>
+              {(authError.code === 'auth/unauthorized-domain' || authError.message.includes('unauthorized-domain')) && (
+                <div className="mt-3 pt-3 border-t border-red-950/40 space-y-2 font-sans bg-black/40 p-2.5 border border-red-900/20 rounded">
+                  <span className="font-semibold text-yellow-500 uppercase block text-[10px] tracking-wide">💡 REQUIRED ACTION ON VERCEL:</span>
+                  <p className="text-[11px] text-zinc-400">
+                    To allow Google standard OAuth from this Vercel deployment, please authorize this origin in your Firebase Console:
+                  </p>
+                  <ol className="list-decimal pl-4 space-y-1 text-[11px] text-zinc-300 mt-1">
+                    <li>
+                      Go to the <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="text-cyan-neon underline hover:text-cyan-400">Firebase Console</a>.
+                    </li>
+                    <li>
+                      Go to your project, then click <strong>Authentication</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Authorized domains</strong>.
+                    </li>
+                    <li>
+                      Click <strong>Add domain</strong> and paste exactly: <code className="bg-red-950/50 border border-red-900/30 px-1 py-0.5 rounded text-yellow-300 font-mono text-[10px] break-all">{authError.domain || window.location.hostname}</code>
+                    </li>
+                    <li>
+                      Click <strong>Add</strong> and then reload this page to retry.
+                    </li>
+                  </ol>
+                </div>
+              )}
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => setAuthError(null)}
+                  className="px-2 py-1 rounded bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white uppercase font-mono text-[10px] tracking-wider transition-colors cursor-pointer"
+                >
+                  Clear &amp; Retry
+                </button>
+              </div>
+            </div>
+          )}
+
+          <p className="text-[10px] text-center text-zinc-500 font-mono uppercase tracking-widest mt-6">
             🔒 CRYPTOGRAPHIC PASSES • CHIP ACCREDITATION
           </p>
+
+          <div className="mt-5 border-t border-zinc-900/60 pt-4 text-center">
+            <details className="group">
+              <summary className="text-[10px] text-zinc-500 hover:text-zinc-350 cursor-pointer select-none uppercase font-mono tracking-widest list-none flex items-center justify-center space-x-1 outline-none">
+                <span>🔧 Vercel Domain Settings Helper</span>
+                <span className="transition-transform group-open:rotate-180 text-[7px]">&bull;</span>
+              </summary>
+              <div className="mt-3 text-left bg-black/40 border border-zinc-900 p-3 rounded-sm text-[11px] text-zinc-400 space-y-2 font-sans leading-relaxed">
+                <p>
+                  When deploying to a custom server or Vercel, Firebase blocks authentication popups from unauthorized domains.
+                </p>
+                <div className="bg-zinc-950/60 p-2.5 rounded border border-zinc-900 text-[10px] space-y-1">
+                  <span className="font-mono text-zinc-500 block uppercase font-bold">Authorized Domains List</span>
+                  <span>Confirm that <strong>{window.location.hostname}</strong> (and if applicable, matching <code>*.vercel.app</code> preview URLs) are added to <strong>Authorized domains</strong> in your Firebase Console.</span>
+                </div>
+              </div>
+            </details>
+          </div>
         </motion.div>
       </div>
     );
