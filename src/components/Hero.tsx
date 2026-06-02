@@ -22,7 +22,7 @@ const heroSlides = [
     titleLine2: "Tournaments",
     description: "Unleashing raw athletic potential under state-of-the-art floodlights. Experience Katsina's most fiercely contested futsal sporting season.",
     tagline: "ATHLETIC EXCELLENCE & GLORY",
-    imageUrl: "https://images.unsplash.com/photo-1544698310-74ea9d1c8258?auto=format&fit=crop&q=80&w=1600&h=900",
+    imageUrl: "https://i.ibb.co/V06zd5dx/Save-Clip-App-581691390-18123718276512424-4472935210024812663-n.jpg",
     isIntroLogo: false
   },
   {
@@ -32,7 +32,7 @@ const heroSlides = [
     titleLine2: "Festivals",
     description: "Fusing traditional Northern Nigerian heritage with electric youth concerts, laser show stages, and stunning visual art exhibitions.",
     tagline: "CULTURE • ART • MUSIC",
-    imageUrl: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1600&h=900",
+    imageUrl: "https://i.ibb.co/gFhJm4Jh/Save-Clip-App-708488662-18142802983512424-676758296547457732-n.jpg",
     isIntroLogo: false
   },
   {
@@ -42,12 +42,12 @@ const heroSlides = [
     titleLine2: "Impact",
     description: "Empowering Katsina youth through city sweepups, recycling programs, and the GRA Food Relief Drive distributing over 2,000+ hot meals.",
     tagline: "YOUTH-LED SOLIDARITY & MUTUAL AID",
-    imageUrl: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80&w=1600&h=900",
+    imageUrl: "https://i.ibb.co/fVvKzP9v/Save-Clip-App-654025080-18153476899394895-5793490402214125762-n.jpg",
     isIntroLogo: false
   }
 ];
 
-export default function Hero() {
+export default function Hero({ onOpenTickets }: { onOpenTickets: (eventId: string | null) => void }) {
   const [currentSlide, setCurrentSlide] = useState(0);
 
   // Auto-play interval for background slide looping
@@ -149,23 +149,8 @@ export default function Hero() {
 
       {/* Hero Content Area */}
       <div className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center">
-        {/* Active Tagline Badge */}
-        <motion.div
-          key={`tagline-${currentSlide}`}
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="inline-flex items-center space-x-2 bg-black/70 border border-gray-800 rounded-full px-4 py-1.5 mb-5 backdrop-blur-sm shadow-[0_0_15px_rgba(0,0,0,0.5)]"
-          id="hero-tagline-badge"
-        >
-          <span className="w-2.5 h-2.5 rounded-full bg-cyan-neon animate-pulse" />
-          <span className="font-mono text-[10px] sm:text-xs uppercase tracking-widest text-cyan-neon font-extrabold">
-            {heroSlides[currentSlide].tagline}
-          </span>
-        </motion.div>
-
         {/* Content Slideshow Wrapper (crossfades details dynamically) */}
-        <div className="min-h-[360px] sm:min-h-[420px] flex flex-col justify-center items-center w-full">
+        <div className="min-h-[380px] sm:min-h-[440px] flex flex-col justify-center items-center w-full">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentSlide}
@@ -186,8 +171,19 @@ export default function Hero() {
                 )}
               </div>
 
+              {/* Active Tagline Badge - Placed below the logo for optimum visibility */}
+              <div
+                className="inline-flex items-center space-x-2 bg-black/85 border border-zinc-800/80 rounded-full px-4 py-1.5 mb-5 backdrop-blur-sm shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+                id="hero-tagline-badge"
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-neon animate-pulse" />
+                <span className="font-mono text-[10px] sm:text-xs uppercase tracking-widest text-cyan-neon font-extrabold">
+                  {heroSlides[currentSlide].tagline}
+                </span>
+              </div>
+
               {/* Title Section */}
-              <div className="space-y-2 mt-2" id="hero-main-header">
+              <div className="space-y-2 mt-1" id="hero-main-header">
                 <h3 className="font-mono text-xs sm:text-sm text-gold-accent font-extrabold uppercase tracking-[0.25em] leading-none glow-gold">
                   {heroSlides[currentSlide].subtitle}
                 </h3>
@@ -266,7 +262,7 @@ export default function Hero() {
           <div className="w-full relative overflow-hidden h-6 flex items-center">
             <div className="animate-ticker flex space-x-16 text-sm font-sans text-gray-300 select-none whitespace-nowrap">
               {liveEvents.map((evt, idx) => (
-                <div key={idx} className="flex items-center space-x-3 cursor-pointer hover:text-white" onClick={() => scrollTo('events')}>
+                <div key={idx} className="flex items-center space-x-3 cursor-pointer hover:text-white" onClick={() => onOpenTickets(evt.id)}>
                   <Calendar className="w-4 h-4 text-gold-accent" />
                   <span className="font-bold text-white">{evt.date}</span>
                   <span className="text-gray-400">|</span>
@@ -279,7 +275,7 @@ export default function Hero() {
               ))}
               {/* Duplicate loop */}
               {liveEvents.map((evt, idx) => (
-                <div key={`dup-${idx}`} className="flex items-center space-x-3 cursor-pointer hover:text-white" onClick={() => scrollTo('events')}>
+                <div key={`dup-${idx}`} className="flex items-center space-x-3 cursor-pointer hover:text-white" onClick={() => onOpenTickets(evt.id)}>
                   <Calendar className="w-4 h-4 text-gold-accent" />
                   <span className="font-bold text-white">{evt.date}</span>
                   <span className="text-gray-400">|</span>

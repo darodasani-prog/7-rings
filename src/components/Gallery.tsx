@@ -109,6 +109,11 @@ export default function Gallery() {
                   referrerPolicy="no-referrer"
                   src={item.url}
                   alt={item.title}
+                  onError={(e) => {
+                    if (item.fallback && e.currentTarget.src !== item.fallback) {
+                      e.currentTarget.src = item.fallback;
+                    }
+                  }}
                   className="w-full h-full object-cover grayscale brightness-90 group-hover:grayscale-0 group-hover:brightness-100 group-hover:scale-105 transition-all duration-500"
                 />
                 
@@ -181,24 +186,34 @@ export default function Gallery() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-500 bg-black/98 backdrop-blur-md flex flex-col justify-center items-center p-4 select-none"
+            onClick={() => setLightboxIndex(null)}
+            className="fixed inset-0 z-[999] bg-black/98 backdrop-blur-md flex flex-col justify-center items-center p-4 select-none cursor-zoom-out"
             id="gallery-lightbox"
           >
             {/* Safe Close Button area */}
             <button
-              onClick={() => setLightboxIndex(null)}
-              className="absolute top-6 right-6 text-gray-400 hover:text-white p-2.5 bg-zinc-950/80 border border-zinc-800 rounded-full cursor-pointer focus:outline-none focus:ring-1 focus:ring-cyan-neon"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightboxIndex(null);
+              }}
+              className="absolute top-6 right-6 text-gray-400 hover:text-white p-2.5 bg-zinc-950/80 border border-zinc-800 rounded-full cursor-pointer focus:outline-none focus:ring-1 focus:ring-cyan-neon z-[1001]"
               aria-label="Close image viewer"
             >
               <Close className="w-6 h-6 border-none" />
             </button>
 
             {/* Content Core Grid */}
-            <div className="relative max-w-4xl w-full flex items-center justify-center">
+            <div 
+              onClick={(e) => e.stopPropagation()} 
+              className="relative max-w-4xl w-full flex items-center justify-center cursor-default"
+            >
               
               {/* Previous Clicker Column */}
               <button
-                onClick={handlePrev}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePrev();
+                }}
                 className="absolute left-2 sm:-left-16 z-20 text-gray-400 hover:text-white p-3 rounded-full bg-zinc-950/60 border border-zinc-850 cursor-pointer focus:outline-none"
                 aria-label="Previous image"
               >
@@ -206,11 +221,17 @@ export default function Gallery() {
               </button>
 
               {/* Main Core Image frame */}
-              <div className="flex flex-col items-center bg-black/40 border border-zinc-900 rounded p-3 shadow-2xl relative max-h-[80vh] w-full max-w-2xl overflow-hidden justify-center">
+              <div className="flex flex-col items-center bg-black/40 border border-zinc-900 rounded p-3 shadow-2xl relative max-h-[80vh] w-full max-w-2xl overflow-hidden justify-center hover:border-zinc-800 transition-colors">
                 <img
                   referrerPolicy="no-referrer"
                   src={filteredItems[lightboxIndex].url}
                   alt={filteredItems[lightboxIndex].title}
+                  onError={(e) => {
+                    const fallback = filteredItems[lightboxIndex].fallback;
+                    if (fallback && e.currentTarget.src !== fallback) {
+                      e.currentTarget.src = fallback;
+                    }
+                  }}
                   className="max-h-[60vh] object-contain rounded-sm"
                 />
                 
@@ -229,7 +250,10 @@ export default function Gallery() {
 
               {/* Next Clicker Column */}
               <button
-                onClick={handleNext}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNext();
+                }}
                 className="absolute right-2 sm:-right-16 z-20 text-gray-400 hover:text-white p-3 rounded-full bg-zinc-950/60 border border-zinc-850 cursor-pointer focus:outline-none"
                 aria-label="Next image"
               >
@@ -240,7 +264,7 @@ export default function Gallery() {
 
             {/* Quick Helper guidelines line */}
             <div className="absolute bottom-6 font-mono text-[10px] text-gray-500 uppercase tracking-widest hidden sm:block">
-              Use keyboard ← or → keys to navigate • Esc to dismiss
+              Click anywhere outside or press Esc to dismiss • ← and → to navigate
             </div>
           </motion.div>
         )}

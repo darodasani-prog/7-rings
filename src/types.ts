@@ -57,6 +57,7 @@ export interface EventItem {
   venue: string;
   description: string;
   image: string;
+  fallback?: string;
   ticketInfo: string; // e.g. "Free Entry", "🎟️ Regular: ₦2,000"
 }
 
@@ -66,4 +67,5 @@ export interface GalleryItem {
   title: string;
   description: string;
   url: string;
+  fallback?: string;
 }

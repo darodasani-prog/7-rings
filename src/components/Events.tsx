@@ -2,7 +2,7 @@ import { motion } from 'motion/react';
 import { Calendar, MapPin, Tag, ArrowUpRight, Award, Music, Sparkles } from 'lucide-react';
 import { upcomingEvents } from '../data/events';
 
-export default function Events() {
+export default function Events({ onOpenTickets }: { onOpenTickets: (eventId: string) => void }) {
   const venuePartners = [
     {
       name: 'Capital One Star Event Complex',
@@ -66,6 +66,7 @@ export default function Events() {
               key={event.id}
               whileHover={{ y: -8 }}
               transition={{ duration: 0.3 }}
+              onClick={() => onOpenTickets(event.id)}
               className="bg-black/80 border border-zinc-900 rounded-sm overflow-hidden flex flex-col justify-between group cursor-pointer shadow-xl relative"
               id={`event-card-${event.id}`}
             >
@@ -78,6 +79,11 @@ export default function Events() {
                   referrerPolicy="no-referrer"
                   src={event.image}
                   alt={event.title}
+                  onError={(e) => {
+                    if (event.fallback && e.currentTarget.src !== event.fallback) {
+                      e.currentTarget.src = event.fallback;
+                    }
+                  }}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />

@@ -25,25 +25,25 @@ export default function About() {
       name: 'Abdul-Rahman Yusuf',
       role: 'Founder & Chief Director',
       bio: 'Visionary behind 7 Rings, orchestrates overall community impact partnerships across Katsina and Northern Nigeria.',
-      image: 'https://picsum.photos/id/1012/300/300'
+      image: 'https://i.ibb.co/ZtjRFSX/Save-Clip-App-502732956-18105965230512424-6356013861276583811-n.jpg'
     },
     {
       name: 'Bashir Dikko',
       role: 'Director of Futsal Operations',
       bio: 'Leads the 7Rings Champions League logistics, safety, venue administration, and grassroots athletic training.',
-      image: 'https://picsum.photos/id/1025/300/300'
+      image: 'https://i.ibb.co/9m7f3KXG/Save-Clip-App-582421801-18123718303512424-2154724019465476571-n.jpg'
     },
     {
       name: 'Fatima Katsina',
       role: 'Creative Production & Arts Lead',
       bio: 'Curator of Sallah fiestas, exhibitions, and musical festivals, amplifying Katsinas rich artistic heritage.',
-      image: 'https://picsum.photos/id/331/300/300'
+      image: 'https://i.ibb.co/rfcVBrWc/Save-Clip-App-707509538-18142534663512424-71640399992815418-n.jpg'
     },
     {
       name: 'Kabir GRA',
       role: 'Community Welfare Coordinator',
       bio: 'Manages the 10,000+ free hot meals outreach agendas and coordinates local GRA volunteer recruitment.',
-      image: 'https://picsum.photos/id/529/300/300'
+      image: 'https://i.ibb.co/twLZw1Pq/Save-Clip-App-659228844-18408400912176634-7455479025550447021-n.jpg'
     }
   ];
 

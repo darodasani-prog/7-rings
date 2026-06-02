@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Stats from './components/Stats';
@@ -7,8 +8,17 @@ import Events from './components/Events';
 import Gallery from './components/Gallery';
 import Contact from './components/Contact';
 import Footer from './components/Footer';
+import TicketSales from './components/TicketSales';
 
 export default function App() {
+  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+
+  const handleOpenTickets = (eventId: string | null = null) => {
+    setSelectedEventId(eventId);
+    setIsTicketModalOpen(true);
+  };
+
   return (
     <div className="bg-dark-bg min-h-screen relative overflow-x-hidden selection:bg-cyan-neon selection:text-black">
       {/* Decorative Outer Border Lines (Anti-Slop Framing / Human Curation style) */}
@@ -16,10 +26,10 @@ export default function App() {
       <div className="fixed inset-y-0 right-0 w-1 sm:w-1.5 bg-gradient-to-t from-cyan-neon via-transparent to-gold-accent opacity-40 z-50 pointer-events-none" />
 
       {/* Structured Single Page Layout */}
-      <Navbar />
+      <Navbar onOpenTickets={handleOpenTickets} />
       
       <main className="flex flex-col w-full relative z-10" id="main-content-flow">
-        <Hero />
+        <Hero onOpenTickets={handleOpenTickets} />
         
         {/* We place Stats right after Hero to draw immediate eyes to the brand's social impact metrics */}
         <Stats />
@@ -28,7 +38,7 @@ export default function App() {
         
         <SportsHub />
         
-        <Events />
+        <Events onOpenTickets={handleOpenTickets} />
         
         <Gallery />
         
@@ -36,6 +46,13 @@ export default function App() {
       </main>
 
       <Footer />
+
+      {/* Dynamic Ticketing Modal Overlay */}
+      <TicketSales 
+        isOpen={isTicketModalOpen} 
+        onClose={() => setIsTicketModalOpen(false)} 
+        preselectedEventId={selectedEventId} 
+      />
     </div>
   );
 }

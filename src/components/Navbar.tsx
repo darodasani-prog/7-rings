@@ -3,7 +3,7 @@ import { Menu, X, Trophy, Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Logo from './Logo';
 
-export default function Navbar() {
+export default function Navbar({ onOpenTickets }: { onOpenTickets: (eventId?: string | null) => void }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
@@ -145,8 +145,16 @@ export default function Navbar() {
             </button>
 
             <button
+              onClick={() => onOpenTickets(null)}
+              className="flex items-center space-x-1.5 px-4.5 py-2 rounded-sm border border-cyan-neon/40 bg-black/40 hover:bg-cyan-neon/10 text-white font-space font-extrabold text-xs uppercase tracking-wider transition-all cursor-pointer box-glow-cyan h-9"
+            >
+              <span className="text-cyan-neon animate-pulse text-xs">🎟️</span>
+              <span>Tickets</span>
+            </button>
+
+            <button
               onClick={() => scrollToSection('sports')}
-              className="flex items-center space-x-2 bg-gradient-to-r from-cyan-neon to-blue-700 hover:brightness-110 text-white font-space font-extrabold text-xs px-5 py-2.5 rounded-sm uppercase tracking-wider shadow-[0_0_20px_rgba(27,82,255,0.4)] transition-all cursor-pointer hover:scale-103"
+              className="flex items-center space-x-2 bg-gradient-to-r from-cyan-neon to-blue-700 hover:brightness-110 text-white font-space font-extrabold text-xs px-5 py-2.5 rounded-sm uppercase tracking-wider shadow-[0_0_20px_rgba(27,82,255,0.4)] transition-all cursor-pointer hover:scale-103 h-9"
             >
               <Trophy className="w-4 h-4" />
               <span>7RCL Register</span>
@@ -214,6 +222,16 @@ export default function Navbar() {
                 >
                   <Trophy className="w-4 h-4" />
                   <span>Register Futsal Team</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onOpenTickets(null);
+                  }}
+                  className="w-full text-center flex items-center justify-center space-x-2 bg-zinc-950 border border-cyan-neon/30 text-cyan-neon hover:text-white hover:bg-cyan-neon/10 font-space font-extrabold py-3 rounded-sm uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  <span>🎟️ Buy Event Tickets</span>
                 </button>
               </div>
             </div>
