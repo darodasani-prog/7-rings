@@ -1,0 +1,6 @@
+{
+  "name": "7 Rings Katsina",
+  "description": "Premier arts, sports, and entertainment hub in Katsina, Nigeria, dedicating resources to youth empowerment, community growth, and the 7Rings Champions League.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
