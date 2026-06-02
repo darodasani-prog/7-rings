@@ -106,8 +106,8 @@ export const galleryItems: GalleryItem[] = [
     category: 'sports',
     title: 'Official Team Jersey Showcase',
     description: 'A beautiful presentation displaying the official 7Rings customized sports wear jersey kit.',
-    url: 'https://i.ibb.co/0pXTC63n/Save-Clip-App-708967344-18142802164512424-6944440201580021835-n.jpg',
-    fallback: 'https://i.ibb.co/0pXTC63n/Save-Clip-App-708967344-18142802164512424-6944440201580021835-n.jpg'
+    url: 'https://i.ibb.co/C5f5GjP2/Save-Clip-App-709266376-18142802344512424-3230420809209678918-n.jpg',
+    fallback: 'https://i.ibb.co/C5f5GjP2/Save-Clip-App-709266376-18142802344512424-3230420809209678918-n.jpg'
   },
   {
     id: 'g_sp_5',
@@ -178,10 +178,10 @@ export const galleryItems: GalleryItem[] = [
   {
     id: 'g_fe_4',
     category: 'festivals',
-    title: 'Sallah Fiesta Crowd Gathering',
-    description: 'Vast community attendance celebrating Sallah fiesta under structured canopies in Katsina.',
-    url: 'https://i.ibb.co/C5f5GjP2/Save-Clip-App-709266376-18142802344512424-3230420809209678918-n.jpg',
-    fallback: 'https://i.ibb.co/C5f5GjP2/Save-Clip-App-709266376-18142802344512424-3230420809209678918-n.jpg'
+    title: 'Kallon Sallah Spectating',
+    description: 'Vast community and spectator audience sitting under structured shaded canopies, watching the beautiful Katsina equestrian parade.',
+    url: 'https://i.ibb.co/0pXTC63n/Save-Clip-App-708967344-18142802164512424-6944440201580021835-n.jpg',
+    fallback: 'https://i.ibb.co/0pXTC63n/Save-Clip-App-708967344-18142802164512424-6944440201580021835-n.jpg'
   },
   {
     id: 'g_fe_5',
@@ -192,18 +192,18 @@ export const galleryItems: GalleryItem[] = [
     fallback: 'https://i.ibb.co/DgVRJRy6/Save-Clip-App-610857715-18128564767512424-2932838539536784345-n.jpg'
   },
   {
-    id: 'g_fe_6',
-    category: 'festivals',
-    title: 'Sallah Holiday Youth Concert',
-    description: 'Vander and youth gatherers celebrating together with live staging and musical shows.',
+    id: 'g_sp_10',
+    category: 'sports',
+    title: 'Championship Sports Award Presentation',
+    description: 'Presenting official champion trophies and season honors to the outstanding futsal players of Katsina.',
     url: 'https://i.ibb.co/Pv9m1fbs/Save-Clip-App-608425459-18128413468512424-1110371233661330437-n.jpg',
     fallback: 'https://i.ibb.co/Pv9m1fbs/Save-Clip-App-608425459-18128413468512424-1110371233661330437-n.jpg'
   },
   {
     id: 'g_fe_7',
     category: 'festivals',
-    title: 'Kallon Sallah Textile Banners',
-    description: 'Vibrant, beautifully printed traditional textile backdrops waving above the festival arena.',
+    title: 'Sallah Festival Decorative Banners',
+    description: 'Vibrant, beautifully printed traditional banners and custom-designed textile displays waving above the festival arena.',
     url: 'https://i.ibb.co/84Nn6gqD/Save-Clip-App-588919166-18128413480512424-1356097351389494606-n.jpg',
     fallback: 'https://i.ibb.co/84Nn6gqD/Save-Clip-App-588919166-18128413480512424-1356097351389494606-n.jpg'
   },

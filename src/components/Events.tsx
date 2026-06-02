@@ -8,7 +8,7 @@ export default function Events({ onOpenTickets }: { onOpenTickets: (eventId: str
       name: 'Capital One Star Event Complex',
       location: 'GRA Area, Katsina (Near Old Government House)',
       features: 'High capacity outdoor stage, floodlights, premium security, air-conditioned VIP domes, custom food parks.',
-      image: 'https://i.ibb.co/C5f5GjP2/Save-Clip-App-709266376-18142802344512424-3230420809209678918-n.jpg'
+      image: 'https://i.ibb.co/0pXTC63n/Save-Clip-App-708967344-18142802164512424-6944440201580021835-n.jpg'
     },
     {
       name: 'Muhammad Dikko Stadium',
