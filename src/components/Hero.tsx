@@ -222,7 +222,10 @@ export default function Hero({ onOpenTickets }: { onOpenTickets: (eventId: strin
           </button>
           
           <button
-            onClick={() => scrollTo('sports')}
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('set-sports-tab', { detail: { tabId: 'register' } }));
+              scrollTo('sports');
+            }}
             className="flex items-center justify-center space-x-2 bg-transparent border border-white/60 hover:border-cyan-neon hover:text-white text-white font-space font-black text-xs uppercase tracking-wider py-4 px-8 rounded-sm cursor-pointer transition-all hover:scale-103 shadow-[0_0_15px_rgba(255,255,255,0.05)]"
             id="hero-cta-register-team"
           >

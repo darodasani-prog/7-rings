@@ -1,10 +1,22 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Trophy, Calendar, Users, Award, ShieldAlert, CheckCircle2, UserCheck, Star } from 'lucide-react';
 import { teamStandings, matchFixtures, playerStats, pastWinners } from '../data/teams';
 
 export default function SportsHub() {
   const [activeTab, setActiveTab] = useState<'standings' | 'fixtures' | 'players' | 'hall' | 'register'>('standings');
+
+  // Programmatically change tabs from other sections via custom events
+  useEffect(() => {
+    const handleSetTab = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tabId: 'standings' | 'fixtures' | 'players' | 'hall' | 'register' }>;
+      if (customEvent.detail && customEvent.detail.tabId) {
+        setActiveTab(customEvent.detail.tabId);
+      }
+    };
+    window.addEventListener('set-sports-tab', handleSetTab);
+    return () => window.removeEventListener('set-sports-tab', handleSetTab);
+  }, []);
   
   // Registration Form State
   const [teamName, setTeamName] = useState('');

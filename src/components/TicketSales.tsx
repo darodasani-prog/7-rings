@@ -94,7 +94,12 @@ export default function TicketSales({ isOpen, onClose, preselectedEventId }: Tic
 
   // Sync preselected event
   useEffect(() => {
-    if (preselectedEventId) {
+    if (preselectedEventId === 'wallet') {
+      setActiveTab('wallet');
+      if (upcomingEvents.length > 0 && !selectedEventId) {
+        setSelectedEventId(upcomingEvents[0].id);
+      }
+    } else if (preselectedEventId) {
       setSelectedEventId(preselectedEventId);
       setActiveTab('book');
       setBookingStep(1);

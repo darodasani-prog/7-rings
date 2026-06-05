@@ -183,7 +183,10 @@ export default function Navbar({ onOpenTickets }: { onOpenTickets: (eventId?: st
             </button>
 
             <button
-              onClick={() => scrollToSection('sports')}
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('set-sports-tab', { detail: { tabId: 'register' } }));
+                scrollToSection('sports');
+              }}
               className="flex items-center space-x-1 bg-gradient-to-r from-cyan-neon to-blue-700 hover:brightness-110 text-white font-space font-extrabold text-[10px] px-3.5 py-1.5 rounded-sm uppercase tracking-wider shadow-[0_0_15px_rgba(27,82,255,0.3)] transition-all cursor-pointer h-8.5"
             >
               <Trophy className="w-3.5 h-3.5" />
@@ -247,7 +250,10 @@ export default function Navbar({ onOpenTickets }: { onOpenTickets: (eventId?: st
                 </button>
 
                 <button
-                  onClick={() => scrollToSection('sports')}
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('set-sports-tab', { detail: { tabId: 'register' } }));
+                    scrollToSection('sports');
+                  }}
                   className="w-full text-center flex items-center justify-center space-x-2 bg-gradient-to-r from-cyan-neon to-blue-700 text-white font-space font-extrabold py-3 rounded-sm uppercase tracking-wider shadow-[0_0_20px_rgba(27,82,255,0.3)]"
                 >
                   <Trophy className="w-4 h-4" />

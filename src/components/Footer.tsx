@@ -49,19 +49,25 @@ export default function Footer() {
           {/* Col 2: Navigation Links */}
           <div className="md:col-span-4 space-y-3">
             <h4 className="font-display font-bold text-xs text-white uppercase tracking-wider">Quick Channels</h4>
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-2 gap-2 text-xs font-sans">
               {[
                 { label: 'Home Entrance', id: 'home' },
                 { label: 'About Story', id: 'about' },
-                { label: '7RCL Futsal', id: 'sports' },
+                { label: '7RCL Standings', id: 'sports', tabId: 'standings' },
+                { label: 'Register Squad', id: 'sports', tabId: 'register' },
                 { label: 'Event Calendar', id: 'events' },
                 { label: 'Media Gallery', id: 'gallery' },
                 { label: 'Contact Office', id: 'contact' }
               ].map((lnk, idx) => (
                 <button
                   key={idx}
-                  onClick={() => scrollTo(lnk.id)}
-                  className="text-left text-gray-400 hover:text-cyan-neon transition-colors cursor-pointer"
+                  onClick={() => {
+                    if (lnk.tabId) {
+                      window.dispatchEvent(new CustomEvent('set-sports-tab', { detail: { tabId: lnk.tabId } }));
+                    }
+                    scrollTo(lnk.id);
+                  }}
+                  className="text-left text-gray-400 hover:text-cyan-neon transition-colors cursor-pointer font-sans"
                 >
                   {lnk.label}
                 </button>
